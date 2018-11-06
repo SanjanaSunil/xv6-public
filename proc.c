@@ -88,6 +88,7 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->priority = 60;
 
   release(&ptable.lock);
 
@@ -327,29 +328,65 @@ scheduler(void)
   c->proc = 0;
   
   for(;;){
+
+    // PRIORITY SCHEDULING
+    int highest_priority = 1000;
+
     // Enable interrupts on this processor.
     sti();
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
+
+    // ROUND ROBIN
+    // for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    //   if(p->state != RUNNABLE)
+    //     continue;
+    //   // Switch to chosen process.  It is the process's job
+    //   // to release ptable.lock and then reacquire it
+    //   // before jumping back to us.
+    //   c->proc = p;
+    //   switchuvm(p);
+    //   p->state = RUNNING;
+
+    //   swtch(&(c->scheduler), p->context);
+    //   switchkvm();
+
+    //   // Process is done running for now.
+    //   // It should have changed its p->state before coming back.
+    //   c->proc = 0;
+    // }
+    //------------------------------------------------
+    
+    // PRIORITY SCHEDULER
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+      if(p->priority < highest_priority)
+        highest_priority = p->priority;
+    }
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
+      if(p->priority == highest_priority){
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
 
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+      }
     }
+    //--------------------------------------------------
+
     release(&ptable.lock);
 
   }
@@ -531,4 +568,51 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+int
+procstat(void)
+{
+  struct proc *p;
+
+  sti();
+
+  acquire(&ptable.lock);
+  cprintf("Name \t PID \t Priority \t \n");
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if(p->state == UNUSED) continue;
+
+    cprintf("%s \t %d \t %d \t  (", p->name, p->pid, p->priority);
+
+    if(p->state == EMBRYO) cprintf("embryo");
+    else if(p->state == SLEEPING) cprintf("sleeping");
+    else if(p->state == RUNNABLE) cprintf("runnable");
+    else if(p->state == RUNNING) cprintf("running");
+    else if(p->state == ZOMBIE) cprintf("zombie");
+
+    cprintf(")\n");
+  }
+  release(&ptable.lock);
+
+  return 22;
+}
+
+int
+set_priority(int pid, int priority)
+{
+  struct proc *p;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if(p->pid == pid) 
+    {
+      p->priority = priority;
+      break;
+    }
+  }
+  release(&ptable.lock);
+
+  return 23;
 }

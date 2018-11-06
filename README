@@ -1,3 +1,16 @@
+CHANGES
+
+The default round robin scheduler has been replaced with a priority
+scheduler, where range of priorirty is between 0 and 100 (the lower
+the value, the higher the priority). The default value of a process
+is initialized to 60.
+
+In addition, ps command has been implemented that lists the process 
+status. A set_priority command has been implemented which takes in two
+arguments: pid of a process and priority value. 
+
+INTRODUCTION
+
 xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
 Version 6 (v6).  xv6 loosely follows the structure and style of v6,
 but is implemented for a modern x86-based multiprocessor using ANSI C.
